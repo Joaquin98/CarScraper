@@ -14,7 +14,7 @@ import threading
 
 class Bot:
 
-    threads_number = 10
+    threads_n = 10
 
     selectors_dict = {
         'brand_section': '//select[@name="makeCodeList"]/option',
@@ -37,6 +37,7 @@ class Bot:
     __WAIT_FOR_ELEMENT_TIMEOUT = 10
     new_posts = set()
     all_posts = set()
+    DEBUG = True
     browser = None
     loaded_cars = set()
     current_user = None
@@ -170,14 +171,6 @@ class Bot:
                 [car_json[title] if title in car_json.keys() else None for title in self.car_titles])
             f_object.close()
 
-    def save_person(self, person_json, user_url):
-        person_json['user_url'] = user_url
-        with codecs.open('./data/profile.csv', 'a+', 'utf8') as f_object:
-            writer_object = writer(f_object)
-            writer_object.writerow(
-                [person_json[title] if title in person_json.keys() else None for title in self.person_titles])
-            f_object.close()
-
     def add_new_link(self, link):
         if link not in self.car_links:
             self.car_links.add(link)
@@ -192,8 +185,6 @@ class Bot:
         file_obj.close()
         self.new_car_links = set()
 
-    DEBUG = True
-
     def info(self, message):
         if self.DEBUG:
             print("-> ", message)
@@ -205,6 +196,47 @@ class Bot:
         for link in self.car_links:
             if link not in self.loaded_cars:
                 self.get_car_info(link)
+
+    def thread_function(self, index, link_list):
+        self.info(f"Thread Init {index}")
+        browser = driver_module.get_driver(True)
+        for link in link_list:
+            self.get_car_info_parrallel(browser, link)
+        browser.close()
+
+    def start_parallel(self):
+        self.info(f"Loaded Cars: {len(self.loaded_cars)}")
+        self.info(f"Total Links: {len(self.car_links)}")
+
+        links_to_fetch = []
+
+        for link in self.car_links:
+            if link not in self.loaded_cars:
+                links_to_fetch.append(link)
+
+        links_threads_list = [[] for _ in range(self.threads_n)]
+        links_len = len(links_to_fetch)
+        i = 0
+        for link in links_to_fetch:
+            links_threads_list[i].append(link)
+            i += 1
+            i %= self.threads_n
+
+        self.threads = list()
+
+        for index in range(self.threads_n):
+            print("CREANDO HILO ", index)
+
+            x = threading.Thread(target=self.thread_function, args=(
+                index, links_threads_list[index]))
+            self.threads.append(x)
+            time.sleep(1)
+            x.start()
+
+        for index, thread in enumerate(self.threads):
+            print("ESPERANDO HILO ", index)
+            thread.join()
+            print("HILO ", index, " TERMINADO", index)
 
     def get_car_info(self, car_link):
 
@@ -231,6 +263,40 @@ class Bot:
 
         try:
             car_dict['City'] = self.browser.find_element(
+                By.XPATH, self.selectors_dict['car_owner_address']).text
+        except Exception:
+            pass
+
+        car_dict['Date'] = datetime.datetime.now().strftime(
+            "%d/%m/%Y, %H:%M:%S")
+
+        self.save_car(car_dict, car_link)
+
+    def get_car_info_parrallel(self, browser, car_link):
+
+        browser.get(car_link)
+
+        car_dict = {}
+        try:
+            car_dict['Name'] = browser.find_element(
+                By.XPATH, self.selectors_dict['car_name']).text
+        except Exception:
+            pass
+
+        try:
+            car_dict['Engine'] = browser.find_element(
+                By.XPATH, self.selectors_dict['car_engine']).text
+        except Exception:
+            pass
+
+        try:
+            car_dict['Dealer_Name'] = browser.find_element(
+                By.XPATH, self.selectors_dict['car_owner_name']).text
+        except Exception:
+            pass
+
+        try:
+            car_dict['City'] = browser.find_element(
                 By.XPATH, self.selectors_dict['car_owner_address']).text
         except Exception:
             pass
@@ -273,49 +339,7 @@ class Bot:
                         first = False
 
 
-def thread_function(index, users):
-    bot = Bot(index, users)
-
-    '''
-    file_obj = codecs.open('results.txt', 'r')
-    users = []
-    for user in [user.replace("\n", "") for user in file_obj.readlines()]:
-        if user not in loaded_users:
-            users.append(user)
-    '''
-
-
-'''
-users = start_files()
-threads_n = NUMERO_DE_HILOS
-
-users_threads_list = [[] for _ in range(threads_n)]
-users_len = len(users)
-i = 0
-for user in users:
-    users_threads_list[i].append(user)
-    i += 1
-    i %= threads_n
-
-threads = list()
-
-
-for index in range(threads_n):
-    print("CREANDO HILO ", index)
-
-    x = threading.Thread(target=thread_function, args=(
-        index, users_threads_list[index]))
-    threads.append(x)
-    time.sleep(1)
-    x.start()
-
-for index, thread in enumerate(threads):
-    print("ESPERANDO HILO ", index)
-    thread.join()
-    print("HILO ", index, " TERMINADO", index)
-'''
-
 bot = Bot()
 
 bot.start_files()
-bot.start()
+bot.start_parallel()

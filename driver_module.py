@@ -11,11 +11,12 @@ def set_proxy(options):
     options.add_argument(f"--proxy-server={proxy_server_url}")
 
 
-def get_driver():
+def get_driver(proxy=False):
     options = uc.ChromeOptions()
     if HEADLESS:
         options.add_argument("--headless")
-    # set_proxy(options)
+    if proxy:
+        set_proxy(options)
     driver = uc.Chrome(options=options)
     return driver
 
