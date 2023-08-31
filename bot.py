@@ -11,20 +11,22 @@ import driver_module
 import undetected_chromedriver as uc
 import threading
 
-"https://www.cargurus.com/Cars/inventorylisting/viewDetailsFilterViewInventoryListing.action?zip=93117&distance=50000"
-
-
-########################## PARAMETROS PARA CAMBIAR ##################################
-NUMERO_DE_HILOS = 6
-#####################################################################################
-
 
 class Bot:
 
+    threads_number = 10
+
     selectors_dict = {
-        'brand_section2': '//select[@name="selectedMakeId"]/optgroup[contains(@label,"All")]/option',
         'brand_section': '//select[@name="makeCodeList"]/option',
-        'car_link': '//div/a[@rel="nofollow"]'
+        'car_link': '//div/a[@rel="nofollow"]',
+        'car_engine': '//div/div[@aria-label="ENGINE_DESCRIPTION"]/parent::div/following-sibling::div',
+        'car_name': '//h1[@data-cmp="heading"]',
+        'car_owner_name': '//div[@data-cmp="ownerDetailsSnapshot"]//h2',
+        'car_owner_contact': '//div[@data-cmp="ownerDetailsSnapshot"]//span[@data-cmp="phoneNumber"]',
+        'car_owner_address': '//div[@data-cmp="ownerDetailsSnapshot"]//div[@data-cmp="address"]',
+        'car_MPG': '//div/div[@aria-label="MPG"]/parent::div/following-sibling::div',
+        'car_MILEAGE': '//div/div[@aria-label="MILEAGE"]/parent::div/following-sibling::div',
+        'car_colorSwatch': '//div/div[@data-cmp="colorSwatch"]/parent::div/following-sibling::div',
     }
 
     brands = set()
@@ -36,12 +38,12 @@ class Bot:
     new_posts = set()
     all_posts = set()
     browser = None
-    loaded_users = set()
+    loaded_cars = set()
     current_user = None
     results_filename = "./bot_data/links.csv"
 
-    car_titles = ['Name', 'Brand', 'Model', 'Type', 'City', 'Engine',
-                  'Color', 'Fuel_Type', 'Warranty', 'Dealer_Name', 'Chassis', 'Year', 'Door', 'Seats', 'Power']
+    car_titles = ['Url', 'Name', 'Brand', 'Model', 'Type', 'City', 'Engine',
+                  'Color', 'Fuel_Type', 'Warranty', 'Dealer_Name', 'Chassis', 'Year', 'Door', 'Seats', 'Power', 'Date']
 
     person_titles = ['user_url', 'person_name',
                      'person_title', 'person_others', 'person_about', 'extraction_date']
@@ -160,6 +162,14 @@ class Bot:
                         # print(e)
                         self.users_errors.append(user)
 
+    def save_car(self, car_json, car_url):
+        car_json['Url'] = car_url
+        with codecs.open('./data/cars.csv', 'a+', 'utf8') as f_object:
+            writer_object = writer(f_object)
+            writer_object.writerow(
+                [car_json[title] if title in car_json.keys() else None for title in self.car_titles])
+            f_object.close()
+
     def save_person(self, person_json, user_url):
         person_json['user_url'] = user_url
         with codecs.open('./data/profile.csv', 'a+', 'utf8') as f_object:
@@ -182,39 +192,53 @@ class Bot:
         file_obj.close()
         self.new_car_links = set()
 
-    def get_person(self):
+    DEBUG = True
 
-        person_section = self.browser.find_element(
-            By.XPATH, self.selectors_dict['person_section'])
+    def info(self, message):
+        if self.DEBUG:
+            print("-> ", message)
 
-        person_dict = {}
+    def start(self):
+        self.info(f"Loaded Cars: {len(self.loaded_cars)}")
+        self.info(f"Total Links: {len(self.car_links)}")
 
+        for link in self.car_links:
+            if link not in self.loaded_cars:
+                self.get_car_info(link)
+
+    def get_car_info(self, car_link):
+
+        self.browser.get(car_link)
+
+        car_dict = {}
         try:
-            person_dict['person_about'] = self.browser.find_element(
-                By.XPATH, self.selectors_dict['person_about']).text
+            car_dict['Name'] = self.browser.find_element(
+                By.XPATH, self.selectors_dict['car_name']).text
         except Exception:
             pass
 
         try:
-            person_dict['person_name'] = person_section.find_element(
-                By.XPATH, self.selectors_dict['person_name']).text
-        except Exception:
-            pass
-        try:
-            person_dict['person_title'] = person_section.find_element(
-                By.XPATH, self.selectors_dict['person_title']).text
-        except Exception:
-            pass
-        try:
-            person_dict['person_others'] = person_section.find_element(
-                By.XPATH, self.selectors_dict['person_others']).text
+            car_dict['Engine'] = self.browser.find_element(
+                By.XPATH, self.selectors_dict['car_engine']).text
         except Exception:
             pass
 
-        person_dict['extraction_date'] = datetime.datetime.now().strftime(
+        try:
+            car_dict['Dealer_Name'] = self.browser.find_element(
+                By.XPATH, self.selectors_dict['car_owner_name']).text
+        except Exception:
+            pass
+
+        try:
+            car_dict['City'] = self.browser.find_element(
+                By.XPATH, self.selectors_dict['car_owner_address']).text
+        except Exception:
+            pass
+
+        car_dict['Date'] = datetime.datetime.now().strftime(
             "%d/%m/%Y, %H:%M:%S")
 
-        self.save_person(person_dict, self.current_user)
+        self.save_car(car_dict, car_link)
 
     def start_files(self):
         loaded_users = set()
@@ -234,27 +258,17 @@ class Bot:
         if not os.path.exists('./data'):
             os.makedirs('./data')
 
-        if not os.path.exists('./data/experience.csv'):
-            file = codecs.open('./data/experience.csv', 'a+', 'utf8')
-            file.write(",".join(Bot.experience_titles) + "\n")
-            file.close()
-
-        if not os.path.exists('./data/education.csv'):
-            file = codecs.open('./data/education.csv', 'a+', 'utf8')
-            file.write(",".join(Bot.education_titles) + "\n")
-            file.close()
-
-        if not os.path.exists('./data/profile.csv'):
-            file = codecs.open('./data/profile.csv', 'a+', 'utf8')
-            file.write(",".join(Bot.person_titles) + "\n")
+        if not os.path.exists('./data/cars.csv'):
+            file = codecs.open('./data/cars.csv', 'a+', 'utf8')
+            file.write(",".join(Bot.car_titles) + "\n")
             file.close()
         else:
-            with codecs.open('./data/profile.csv', "r", encoding="utf8") as file:
+            with codecs.open('./data/cars.csv', "r", encoding="utf8") as file:
                 reader = csv.reader(file, delimiter=",")
                 first = True
                 for row in reader:
                     if first:
-                        loaded_users.add(row[0])
+                        self.loaded_cars.add(row[0])
                     else:
                         first = False
 
@@ -304,4 +318,4 @@ for index, thread in enumerate(threads):
 bot = Bot()
 
 bot.start_files()
-bot.get_brands()
+bot.start()
