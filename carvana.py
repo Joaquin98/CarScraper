@@ -10,11 +10,12 @@ from selenium.webdriver.common.by import By
 import driver_module
 import undetected_chromedriver as uc
 import threading
+import re
 
 
 class Bot:
 
-    threads_n = 10
+    threads_n = 5
 
     selectors_dict = {
         'brand_section': '//select[@name="makeCodeList"]/option',
@@ -58,25 +59,16 @@ class Bot:
     def __init__(self) -> None:
         # self.users = users
         # self.iteration()
-        self.browser = driver_module.get_driver()
+        self.browser = None
 
     def get_brands(self):
-        '''
-        Autotrader:
-            - No se puede cambiar la página por url
-            - Se llega máximo hasta la página 40
-            - Se tendría que dividir la búsqueda
-            https://www.autotrader.com/cars-for-sale/used-cars?
-            endYear=2022&firstRecord=311&isNewSearch=false&marketExtension=include&numRecords=24&searchRadius=0&sortBy=relevance&startYear=2010
-
-            https://www.autotrader.com/cars-for-sale/suzuki?endYear=2022&isNewSearch=true&marketExtension=include&numRecords=24&searchRadius=0&sortBy=relevance&startYear=2010
-        '''
-        search_url = "https://www.cargurus.com/Cars/inventorylisting/viewDetailsFilterViewInventoryListing.action?zip=93117&distance=50000"
-        search_url = "https://www.autotrader.com/cars-for-sale/all-cars/buick/goleta-ca?zip=93117"
-        search_url = "https://carvana.com/"
-        search_url = "https://www.autotrader.com/cars-for-sale/used-cars?endYear=2022&isNewSearch=true&marketExtension=include&numRecords=24&searchRadius=0&sortBy=relevance&startYear=2010"
-        self.browser.get(search_url)
-        input()
+        while True:
+            self.browser = driver_module.get_driver(True)
+            search_url = "https://carvana.com/"
+            self.browser.get(search_url)
+            x = input()
+            if x == 's':
+                return
         brands_elements = self.browser.find_elements(
             By.XPATH, self.selectors_dict['brand_section'])
         for brand in brands_elements:
@@ -107,61 +99,6 @@ class Bot:
     def create_url(self, user, country):
         user = user.replace("www.", country + ".") + self.google_reference
         return user
-
-    def iteration(self):
-        self.users_errors = []
-
-        while len(self.users):
-            times = 0
-            self.browser = driver_module.get_driver2()
-            for country in self.countries:
-                if len(self.users):
-                    if times == 5:
-                        self.browser.close()
-                        self.browser = driver_module.get_driver2()
-                    times += 1
-                    user = self.users.pop()
-                    self.current_user = user
-                    url = self.create_url(user, country)
-                    try:
-                        self.browser.get(url)
-                        time.sleep(3)
-                        try:
-                            self.get_education()
-                            self.get_experience()
-                            self.get_person()
-                        except Exception as e:
-                            # print(e)
-                            self.users_errors.append(user)
-                    except Exception as e:
-                        # print(e)
-                        self.users_errors.append(user)
-
-        for i in range(len(self.users_errors)*5):
-            times = 0
-            self.browser = driver_module.get_driver2()
-            for country in self.countries:
-                if len(self.users_errors):
-                    if times == 5:
-                        self.browser.close()
-                        self.browser = driver_module.get_driver2()
-                    times += 1
-                    user = self.users_errors.pop()
-                    self.current_user = user
-                    url = self.create_url(user, country)
-                    try:
-                        self.browser.get(url)
-                        time.sleep(3)
-                        try:
-                            self.get_education()
-                            self.get_experience()
-                            self.get_person()
-                        except Exception as e:
-                            # print(e)
-                            self.users_errors.append(user)
-                    except Exception as e:
-                        # print(e)
-                        self.users_errors.append(user)
 
     def save_car(self, car_json, car_url):
         car_json['Url'] = car_url
@@ -201,7 +138,11 @@ class Bot:
         self.info(f"Thread Init {index}")
         browser = driver_module.get_driver(True)
         for link in link_list:
-            self.get_car_info_parrallel(browser, link)
+            ok = self.get_car_info_parrallel(browser, link)
+            while not ok:
+                browser.close()
+                browser = driver_module.get_driver(True)
+                ok = self.get_car_info_parrallel(browser, link)
         browser.close()
 
     def start_parallel(self):
@@ -267,10 +208,32 @@ class Bot:
         except Exception:
             pass
 
+        try:
+            car_dict['Color'] = self.browser.find_element(
+                By.XPATH, self.selectors_dict['car_colorSwatch']).text
+        except Exception:
+            pass
+
         car_dict['Date'] = datetime.datetime.now().strftime(
             "%d/%m/%Y, %H:%M:%S")
 
         self.save_car(car_dict, car_link)
+
+    def get_year_brand_model_from_name(self, name):
+        return name.split(" ", 3)
+
+    def get_fuel_type_from_engine(self, engine):
+        fuel_type = None
+        if "Gas/Electric" in engine:
+            fuel_type = "Gas/Electric"
+        elif "Gas" in engine:
+            fuel_type = "Gas"
+        elif "Fuel" in engine:
+            fuel_type = "Fuel"
+        else:
+            fuel_type = "Electric"
+
+        return fuel_type
 
     def get_car_info_parrallel(self, browser, car_link):
 
@@ -282,6 +245,9 @@ class Bot:
                 By.XPATH, self.selectors_dict['car_name']).text
         except Exception:
             pass
+
+        if 'Name' not in car_dict.keys():
+            return False
 
         try:
             car_dict['Engine'] = browser.find_element(
@@ -301,10 +267,20 @@ class Bot:
         except Exception:
             pass
 
+        if 'Name' in car_dict.keys():
+            _, car_dict['Year'], car_dict['Brand'], car_dict['Model'] = self.get_year_brand_model_from_name(
+                car_dict['Name'])
+
+        if 'Engine' in car_dict.keys():
+            car_dict['Fuel_Type'] = self.get_fuel_type_from_engine(
+                car_dict['Engine'])
+
         car_dict['Date'] = datetime.datetime.now().strftime(
             "%d/%m/%Y, %H:%M:%S")
 
         self.save_car(car_dict, car_link)
+
+        return True
 
     def start_files(self):
         loaded_users = set()
@@ -341,5 +317,4 @@ class Bot:
 
 bot = Bot()
 
-bot.start_files()
-bot.start_parallel()
+bot.get_brands()
