@@ -19,6 +19,8 @@ class Bot:
 
     selectors_dict = {
         'brand_section': '//select[@name="makeCodeList"]/option',
+        'next_page_filter': '//li/a[@aria-label="Next Page" and @role = "button"]',
+        'close_popup': '//button[@aria-label="Close dialog"]',
         'car_link': '//div/a[@rel="nofollow"]',
         'car_engine': '//div/div[@aria-label="ENGINE_DESCRIPTION"]/parent::div/following-sibling::div',
         'car_name': '//h1[@data-cmp="heading"]',
@@ -47,15 +49,6 @@ class Bot:
     car_titles = ['Url', 'Name', 'Brand', 'Model', 'Type', 'City', 'Engine',
                   'Color', 'Fuel_Type', 'Warranty', 'Dealer_Name', 'Chassis', 'Year', 'Door', 'Seats', 'Power', 'Date']
 
-    person_titles = ['user_url', 'person_name',
-                     'person_title', 'person_others', 'person_about', 'extraction_date']
-
-    experience_titles = ['user_url', 'experience_link',
-                         'experience_title', 'experience_subtitle', 'experience_location', 'experience_date', 'experience_text', 'extraction_date']
-
-    education_titles = ['user_url', 'education_link', 'education_title',
-                        'education_subtitle', 'education_date', 'education_text', 'extraction_date']
-
     def __init__(self) -> None:
         # self.users = users
         # self.iteration()
@@ -64,6 +57,8 @@ class Bot:
     def get_brands(self):
         '''
         Autotrader:
+            - Poner paginación en 100
+            - Dividir por cada año
             - No se puede cambiar la página por url
             - Se llega máximo hasta la página 40
             - Se tendría que dividir la búsqueda
@@ -77,29 +72,76 @@ class Bot:
         search_url = "https://carvana.com/"
         search_url = "https://www.autotrader.com/cars-for-sale/used-cars?endYear=2022&isNewSearch=true&marketExtension=include&numRecords=24&searchRadius=0&sortBy=relevance&startYear=2010"
         self.browser.get(search_url)
-        input()
+
+        try:
+            WebDriverWait(self.browser, 15).until(EC.presence_of_element_located(
+                (By.XPATH, self.selectors_dict['brand_section'])))
+        except Exception:
+            self.info("No brands")
+
+        # input()
         brands_elements = self.browser.find_elements(
             By.XPATH, self.selectors_dict['brand_section'])
         for brand in brands_elements:
-            brand_value = brand.get_attribute('value')
+            brand_value = brand.get_attribute('label')
+            brand_value = brand_value.strip()
             if brand_value != "Any Make":
+                brand_value = brand_value.replace(' ', '-')
                 self.brands.add(brand_value)
 
-        print(self.brands)
+        self.info("All Brands: " + str(self.brands))
 
         for brand in self.brands:
-            self.browser.get(
-                f"https://www.autotrader.com/cars-for-sale/{brand}?endYear=2022&isNewSearch=true&marketExtension=include&numRecords=24&searchRadius=0&sortBy=relevance&startYear=2010")
+            for year in range(2010, 2023):
+                self.info(f"Brand: {brand} - Year: {year}")
+                url = f"https://www.autotrader.com/cars-for-sale/{brand}?endYear={year}&isNewSearch=true&marketExtension=include&numRecords=100&searchRadius=0&sortBy=relevance&startYear={year}"
+                self.info(url)
+                results = 0
+                self.browser.get(url)
 
-            link_elements = self.browser.find_elements(
-                By.XPATH, self.selectors_dict['car_link'])
-            for link in link_elements:
-                link_value = link.get_attribute('href')
-                if 'car' in link_value:
-                    self.add_new_link(link_value)
-                    # self.car_links.add(link_value)
-            print(len(self.new_car_links))
-            self.save_links()
+                try:
+                    link_elements = self.browser.find_element(
+                        By.XPATH, self.selectors_dict['close_popup']).click()
+                except Exception as e:
+                    pass
+
+                next = True
+                while next:
+
+                    link_elements = self.browser.find_elements(
+                        By.XPATH, self.selectors_dict['car_link'])
+                    for link in link_elements:
+                        link_value = link.get_attribute('href')
+                        if 'car' in link_value:
+                            pattern = 'listingId=(\d{9})'
+                            match = re.search(pattern, link_value)
+                            if match:
+                                self.add_new_link(match.group(1))
+                                # self.add_new_link(link_value)
+
+                    results += len(self.new_car_links)
+                    self.save_links()
+                    time.sleep(1)
+
+                    for i in range(20):
+                        place = 400
+                        try:
+                            self.browser.find_element(
+                                By.XPATH, self.selectors_dict['next_page_filter']).click()
+                            time.sleep(4)
+                            break
+                        except Exception as e:
+                            # print(e)
+                            self.browser.execute_script(
+                                f"window.scrollTo(0, {place});")
+                            time.sleep(0.3)
+                            place += 400
+                        if i == 19:
+                            next = False
+
+                    self.info(f"Results {results}")
+                time.sleep(3)
+
             time.sleep(3)
             # input()
 
@@ -246,7 +288,8 @@ class Bot:
 
     def get_car_info_parrallel(self, browser, car_link):
 
-        browser.get(car_link)
+        browser.get(
+            "https://www.autotrader.com/cars-for-sale/vehicledetails.xhtml?listingId=" + car_link)
 
         car_dict = {}
         try:
@@ -292,7 +335,6 @@ class Bot:
         return True
 
     def start_files(self):
-        loaded_users = set()
 
         if not os.path.exists('./bot_data'):
             os.makedirs('./bot_data')
@@ -323,8 +365,20 @@ class Bot:
                     else:
                         first = False
 
+    def get_id_from_links(self):
+        init_set = self.car_links
+        print(len(init_set))
+        for link in init_set:
+            pattern = 'listingId=(\d{9})'
+            match = re.search(pattern, link)
+            if match:
+                self.new_car_links.add(match.group(1))
+        self.save_links()
+
 
 bot = Bot()
 
 bot.start_files()
-bot.start_parallel()
+# bot.get_id_from_links()
+# bot.start_parallel()
+bot.get_brands()

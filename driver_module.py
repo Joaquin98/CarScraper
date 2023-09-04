@@ -2,8 +2,8 @@ import undetected_chromedriver as uc
 from fp.fp import FreeProxy
 from selenium import webdriver
 
-HEADLESS = True
 HEADLESS = False
+HEADLESS = True
 
 
 def set_proxy(options):
