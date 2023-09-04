@@ -11,11 +11,12 @@ import driver_module
 import undetected_chromedriver as uc
 import threading
 import re
+import sys
 
 
 class Bot:
 
-    threads_n = 5
+    threads_n = 2
 
     selectors_dict = {
         'brand_section': '//select[@name="makeCodeList"]/option',
@@ -187,12 +188,13 @@ class Bot:
 
     def thread_function(self, index, link_list):
         self.info(f"Thread Init {index}")
-        browser = driver_module.get_driver(True)
+        proxy = False  # True
+        browser = driver_module.get_driver(proxy)
         for link in link_list:
             ok = self.get_car_info_parrallel(browser, link)
             while not ok:
                 browser.close()
-                browser = driver_module.get_driver(True)
+                browser = driver_module.get_driver(proxy)
                 ok = self.get_car_info_parrallel(browser, link)
         browser.close()
 
@@ -287,9 +289,8 @@ class Bot:
         return fuel_type
 
     def get_car_info_parrallel(self, browser, car_link):
-
-        browser.get(
-            "https://www.autotrader.com/cars-for-sale/vehicledetails.xhtml?listingId=" + car_link)
+        car_link = "https://www.autotrader.com/cars-for-sale/vehicledetails.xhtml?listingId=" + car_link
+        browser.get(car_link)
 
         car_dict = {}
         try:
@@ -376,9 +377,15 @@ class Bot:
         self.save_links()
 
 
-bot = Bot()
+if __name__ == "__main__":
+    bot = Bot()
+    bot.start_files()
+    option = int(
+        input("1 - Get post ids.\n2 - Get data from stored post ids.\n"))
 
-bot.start_files()
-# bot.get_id_from_links()
-# bot.start_parallel()
-bot.get_brands()
+    if option == 1:
+        bot.get_brands()
+    elif option == 2:
+        bot.start_parallel()
+    else:
+        print("Wrong input")
