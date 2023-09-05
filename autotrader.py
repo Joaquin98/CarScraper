@@ -16,7 +16,7 @@ import sys
 
 class Bot:
 
-    threads_n = 2
+    threads_n = 6
 
     selectors_dict = {
         'brand_section': '//select[@name="makeCodeList"]/option',
