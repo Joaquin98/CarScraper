@@ -16,7 +16,7 @@ import sys
 
 class Bot:
 
-    threads_n = 6
+    threads_n = 10
 
     selectors_dict = {
         'brand_section': '//select[@name="makeCodeList"]/option',
@@ -30,7 +30,10 @@ class Bot:
         'car_owner_address': '//div[@data-cmp="ownerDetailsSnapshot"]//div[@data-cmp="address"]',
         'car_MPG': '//div/div[@aria-label="MPG"]/parent::div/following-sibling::div',
         'car_MILEAGE': '//div/div[@aria-label="MILEAGE"]/parent::div/following-sibling::div',
+        'car_colorSwatch2': '//div/div[contains(@class,"color-swatch")]',
         'car_colorSwatch': '//div/div[@data-cmp="colorSwatch"]/parent::div/following-sibling::div',
+        'car_data_columns': '//div/ul[@data-cmp="listColumns"]',
+        'car_data_accordian': '//div/div[@data-cmp="accordian"]/div[@data-cmp="accordionPanel"]'
     }
 
     brands = set()
@@ -53,7 +56,8 @@ class Bot:
     def __init__(self) -> None:
         # self.users = users
         # self.iteration()
-        self.browser = driver_module.get_driver()
+        # self.browser = driver_module.get_driver()
+        pass
 
     def get_brands(self):
         '''
@@ -72,6 +76,7 @@ class Bot:
         search_url = "https://www.autotrader.com/cars-for-sale/all-cars/buick/goleta-ca?zip=93117"
         search_url = "https://carvana.com/"
         search_url = "https://www.autotrader.com/cars-for-sale/used-cars?endYear=2022&isNewSearch=true&marketExtension=include&numRecords=24&searchRadius=0&sortBy=relevance&startYear=2010"
+        self.browser = driver_module.get_driver()
         self.browser.get(search_url)
 
         try:
@@ -193,8 +198,8 @@ class Bot:
         for link in link_list:
             ok = self.get_car_info_parrallel(browser, link)
             while not ok:
-                browser.close()
-                browser = driver_module.get_driver(proxy)
+                # browser.close()
+                # browser = driver_module.get_driver(proxy)
                 ok = self.get_car_info_parrallel(browser, link)
         browser.close()
 
@@ -262,9 +267,16 @@ class Bot:
             pass
 
         try:
-            car_dict['Color'] = self.browser.find_element(
-                By.XPATH, self.selectors_dict['car_colorSwatch']).text
-        except Exception:
+            colors = self.browser.find_elements(
+                By.XPATH, self.selectors_dict['car_data_columns'])
+
+            print(self.selectors_dict['car_colorSwatch'])
+            print(colors)
+            for color in colors:
+                car_dict['Color'] += color.text + "\n"
+            print(car_dict['Color'])
+        except Exception as e:
+            print(e)
             pass
 
         car_dict['Date'] = datetime.datetime.now().strftime(
@@ -291,7 +303,8 @@ class Bot:
     def get_car_info_parrallel(self, browser, car_link):
         car_link = "https://www.autotrader.com/cars-for-sale/vehicledetails.xhtml?listingId=" + car_link
         browser.get(car_link)
-
+        # self.browser.execute_script(
+        #    f"window.scrollTo(0, {700});")
         car_dict = {}
         try:
             car_dict['Name'] = browser.find_element(
@@ -318,6 +331,16 @@ class Bot:
             car_dict['City'] = browser.find_element(
                 By.XPATH, self.selectors_dict['car_owner_address']).text
         except Exception:
+            pass
+
+        try:
+            colors = browser.find_elements(
+                By.XPATH, self.selectors_dict['car_colorSwatch'])
+            car_dict['Color'] = ""
+            for color in colors:
+                car_dict['Color'] += color.text + "\n"
+        except Exception as e:
+            print(e)
             pass
 
         if 'Name' in car_dict.keys():
