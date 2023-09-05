@@ -16,7 +16,7 @@ import sys
 
 class Bot:
 
-    threads_n = 10
+    threads_n = 1
 
     selectors_dict = {
         'brand_section': '//select[@name="makeCodeList"]/option',
@@ -33,7 +33,9 @@ class Bot:
         'car_colorSwatch2': '//div/div[contains(@class,"color-swatch")]',
         'car_colorSwatch': '//div/div[@data-cmp="colorSwatch"]/parent::div/following-sibling::div',
         'car_data_columns': '//div/ul[@data-cmp="listColumns"]',
-        'car_data_accordian': '//div/div[@data-cmp="accordian"]/div[@data-cmp="accordionPanel"]'
+        'car_data_accordian': '//div/div[@data-cmp="accordian"]/div[@data-cmp="accordionPanel"]',
+        'show_more_button': '//div/div[@data-cmp="accordian"]/div[@data-cmp="accordionPanel"]//span[contains(@class, "glyphicon-open")]/parent::div/parent::div',
+        'show_more_button2': '//div/div[@data-cmp="accordian"]//span[contains(@class, "glyphicon-open")]'
     }
 
     brands = set()
@@ -51,7 +53,7 @@ class Bot:
     results_filename = "./bot_data/links.csv"
 
     car_titles = ['Url', 'Name', 'Brand', 'Model', 'Type', 'City', 'Engine',
-                  'Color', 'Fuel_Type', 'Warranty', 'Dealer_Name', 'Chassis', 'Year', 'Door', 'Seats', 'Power', 'Date']
+                  'Color', 'Fuel_Type', 'Warranty', 'Dealer_Name', 'Chassis', 'Year', 'Door', 'Seats', 'Power', 'Other', 'Date']
 
     def __init__(self) -> None:
         # self.users = users
@@ -303,8 +305,10 @@ class Bot:
     def get_car_info_parrallel(self, browser, car_link):
         car_link = "https://www.autotrader.com/cars-for-sale/vehicledetails.xhtml?listingId=" + car_link
         browser.get(car_link)
-        # self.browser.execute_script(
-        #    f"window.scrollTo(0, {700});")
+        time.sleep(1)
+        browser.execute_script(
+            f"window.scrollTo(0, {1600});")
+        time.sleep(1)
         car_dict = {}
         try:
             car_dict['Name'] = browser.find_element(
@@ -341,6 +345,25 @@ class Bot:
                 car_dict['Color'] += color.text + "\n"
         except Exception as e:
             print(e)
+            pass
+
+        try:
+            more = True
+            while more:
+                try:
+                    browser.find_element(
+                        By.XPATH, self.selectors_dict['show_more_button']).click()
+                    time.sleep(0.2)
+                except Exception as e:
+                    more = False
+
+            tabs = browser.find_elements(
+                By.XPATH, self.selectors_dict['car_data_accordian'])
+            car_dict['Other'] = ""
+            for tab in tabs:
+                car_dict['Other'] += tab.text + "\n"
+        except Exception as e:
+            # print(e)
             pass
 
         if 'Name' in car_dict.keys():
