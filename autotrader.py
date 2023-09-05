@@ -16,7 +16,7 @@ import sys
 
 class Bot:
 
-    threads_n = 1
+    threads_n = 5
 
     selectors_dict = {
         'brand_section': '//select[@name="makeCodeList"]/option',
@@ -226,7 +226,7 @@ class Bot:
         self.threads = list()
 
         for index in range(self.threads_n):
-            print("CREANDO HILO ", index)
+            print("CREATING THREAD ", index)
 
             x = threading.Thread(target=self.thread_function, args=(
                 index, links_threads_list[index]))
@@ -235,9 +235,9 @@ class Bot:
             x.start()
 
         for index, thread in enumerate(self.threads):
-            print("ESPERANDO HILO ", index)
+            print("WAITING ", index)
             thread.join()
-            print("HILO ", index, " TERMINADO", index)
+            print("THREAD ", index, " DONE", index)
 
     def get_car_info(self, car_link):
 
