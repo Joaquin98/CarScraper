@@ -11,7 +11,6 @@ import driver_module
 import undetected_chromedriver as uc
 import threading
 import re
-import sys
 
 
 class Bot:
@@ -35,7 +34,6 @@ class Bot:
         'car_data_columns': '//div/ul[@data-cmp="listColumns"]',
         'car_data_accordian': '//div/div[@data-cmp="accordian"]/div[@data-cmp="accordionPanel"]',
         'show_more_button': '//div/div[@data-cmp="accordian"]/div[@data-cmp="accordionPanel"]//span[contains(@class, "glyphicon-open")]/parent::div/parent::div',
-        'show_more_button2': '//div/div[@data-cmp="accordian"]//span[contains(@class, "glyphicon-open")]'
     }
 
     brands = set()
@@ -62,21 +60,7 @@ class Bot:
         pass
 
     def get_brands(self):
-        '''
-        Autotrader:
-            - Poner paginación en 100
-            - Dividir por cada año
-            - No se puede cambiar la página por url
-            - Se llega máximo hasta la página 40
-            - Se tendría que dividir la búsqueda
-            https://www.autotrader.com/cars-for-sale/used-cars?
-            endYear=2022&firstRecord=311&isNewSearch=false&marketExtension=include&numRecords=24&searchRadius=0&sortBy=relevance&startYear=2010
 
-            https://www.autotrader.com/cars-for-sale/suzuki?endYear=2022&isNewSearch=true&marketExtension=include&numRecords=24&searchRadius=0&sortBy=relevance&startYear=2010
-        '''
-        search_url = "https://www.cargurus.com/Cars/inventorylisting/viewDetailsFilterViewInventoryListing.action?zip=93117&distance=50000"
-        search_url = "https://www.autotrader.com/cars-for-sale/all-cars/buick/goleta-ca?zip=93117"
-        search_url = "https://carvana.com/"
         search_url = "https://www.autotrader.com/cars-for-sale/used-cars?endYear=2022&isNewSearch=true&marketExtension=include&numRecords=24&searchRadius=0&sortBy=relevance&startYear=2010"
         self.browser = driver_module.get_driver()
         self.browser.get(search_url)

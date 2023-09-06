@@ -19,26 +19,3 @@ def get_driver(proxy=False):
         set_proxy(options)
     driver = uc.Chrome(options=options)
     return driver
-
-
-def get_driver2():
-
-    # Define las opciones del navegador
-    options = webdriver.ChromeOptions()
-
-    # Adding argument to disable the AutomationControlled flag
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument('--log-level=3')
-    if HEADLESS:
-        options.add_argument("--headless")
-    set_proxy(options)
-    # Exclude the collection of enable-automation switches
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-
-    # Turn-off userAutomationExtension
-    options.add_experimental_option("useAutomationExtension", False)
-
-    # Setting the driver path and requesting a page
-    driver = webdriver.Chrome(options=options)
-
-    return driver
